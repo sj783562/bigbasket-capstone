@@ -39,31 +39,36 @@ ORDER BY
     month;
 
 -- (c) Variance vs target, with Above/Watch/Critical tiering
-SELECT 
+WITH category_revenue AS (
+    SELECT
+        p.category,
+        SUM(o.amount_inr) AS total_revenue
+
+    FROM orders o
+
+    JOIN products p 
+    ON o.product_id = p.product_id
+
+    WHERE o.status = 'Delivered'
+    GROUP BY p.category
+)
+
+SELECT
     r.category,
     r.total_revenue,
     t.target_revenue_inr,
-    (t.target_revenue_inr - r.total_revenue) AS variance,
-    ((r.total_revenue - t.target_revenue_inr) * 100.0) / t.target_revenue_inr AS pct_variance,
+    (r.total_revenue - t.target_revenue_inr) AS variance,
+    CASE
+        WHEN t.target_revenue_inr = 0 THEN NULL
+        ELSE ((r.total_revenue - t.target_revenue_inr) * 100.0) / t.target_revenue_inr
+    END AS pct_variance,
     CASE
         WHEN r.total_revenue >= t.target_revenue_inr THEN 'Above Target'
         WHEN r.total_revenue >= t.target_revenue_inr * 0.85 THEN 'Below Target - Watch'
         ELSE 'Below Target - Critical'
     END AS status
 
-FROM (
-  SELECT 
-    p.category, 
-    SUM(o.amount_inr) AS total_revenue
-
-  FROM orders o 
-
-  JOIN products p 
-  ON o.product_id = p.product_id
-
-  WHERE o.status = 'Delivered'
-  GROUP BY p.category
-) r
+FROM category_revenue r
 
 JOIN category_targets t 
 ON r.category = t.category;
